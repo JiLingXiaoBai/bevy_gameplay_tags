@@ -8,11 +8,30 @@ fn compute_hash(input: &str) -> u64 {
     input.hash(&mut hasher);
     hasher.finish()
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UniqueName {
+    index: u32,
+}
+impl fmt::Debug for UniqueName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UniqueName({})", self.index)
+    }
+}
 
 #[derive(Resource)]
 pub struct UniqueNamePool {
     entry_pool: Vec<String>,
     lookup_hash: HashMap<u64, u32>,
+}
+impl Default for UniqueNamePool {
+    fn default() -> Self {
+        let mut pool = Self {
+            entry_pool: Vec::new(),
+            lookup_hash: HashMap::new(),
+        };
+        pool.entry_pool.push("".to_string());
+        pool
+    }
 }
 
 impl UniqueNamePool {
@@ -42,8 +61,7 @@ impl UniqueNamePool {
         }
         let new_index = self.entry_pool.len() as u32;
         if new_index == u32::MAX {
-            error!("UniqueNamePool capacity exceeded (u32::MAX)");
-            return 0;
+            panic!("UniqueNamePool capacity exceeded (u32::MAX)");
         }
         self.entry_pool.push(name.to_string());
         self.lookup_hash.insert(hash, new_index);
@@ -65,27 +83,6 @@ impl UniqueNamePool {
 
     pub fn clear(&mut self) {
         self.lookup_hash.clear();
-        self.entry_pool.clear();
-    }
-}
-
-impl Default for UniqueNamePool {
-    fn default() -> Self {
-        let mut pool = Self {
-            entry_pool: Vec::new(),
-            lookup_hash: HashMap::new(),
-        };
-        pool.entry_pool.push("".to_string());
-        pool
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UniqueName {
-    index: u32,
-}
-impl fmt::Debug for UniqueName {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UniqueName({})", self.index)
+        self.entry_pool.truncate(1); // only keep the first element: ""
     }
 }

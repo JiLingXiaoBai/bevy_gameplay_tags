@@ -1,51 +1,33 @@
-extern crate core;
-
-mod gameplay_tags;
-mod unique_name;
-
 use bevy::prelude::*;
-use unique_name::*;
+use bevy_gameplay_tags::*;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .insert_resource(UniqueNamePool::default())
-        .add_systems(Startup, (setup_system, setup_names_system.after(setup_system)))
-        .add_systems(Update, (print_names_system, add_names_system))
+        .add_plugins(GameplayTagBundlePlugin)
+        .add_systems(Startup, register_initial_tags)
         .run();
 }
-fn setup_names_system(mut pool: ResMut<UniqueNamePool>) {
-    info!("--- Initializing Unique Names ---");
+fn register_initial_tags(mut register: GameplayTagRegister) {
+    info!("--- 正在注册游戏性标签 ---");
 
-    let player = pool.new_name("PlayerCharacter");
-    info!("'PlayerCharacter' created: {:?}", player); // Output: UniqueName(1)
+    // 注册根标签
+    let ability_tag = register.request_or_register_tag("Ability");
+    let effect_tag = register.request_or_register_tag("Effect");
+    let character_tag = register.request_or_register_tag("Character");
 
-    let enemy = pool.new_name("EnemyUnit");
-    info!("'EnemyUnit' created: {:?}", enemy); // Output: UniqueName(2)
+    // 注册子标签 (会自动注册其父标签)
+    let ability_fireball = register.request_or_register_tag("Ability.Fireball");
+    let ability_heal = register.request_or_register_tag("Ability.Heal");
 
-    let player_again = pool.new_name("PlayerCharacter");
-    info!("'PlayerCharacter' retrieved: {:?}", player_again); // Output: UniqueName(1)
+    // 注册多级标签
+    let effect_debuff_stun = register.request_or_register_tag("Effect.Debuff.Stun");
+    let effect_buff_speed = register.request_or_register_tag("Effect.Buff.Speed");
 
-    let empty_name = pool.new_name("");
-    info!("Empty name created: {:?}", empty_name); // Output: UniqueName(0)
-
-    assert_eq!(player, player_again);
-}
-
-fn setup_system(mut pool: ResMut<UniqueNamePool>) {
-    pool.clear();
-}
-
-fn print_names_system(mut pool: ResMut<UniqueNamePool>) {
-    let player = pool.new_name("Player");
-    let enemy = pool.new_name("Enemy");
-    let player_name = pool.get_display_str(&player);
-    let enemy_name = pool.get_display_str(&enemy);
-
-    info!("Player: {}", player_name);
-    info!("Enemy: {}", enemy_name);
-}
-
-fn add_names_system(mut pool: ResMut<UniqueNamePool>) {
-    let _ = pool.new_name("NPC");
+    info!("标签注册完成。");
+    info!("Ability 索引: {}", ability_tag.tag_bit_index);
+    info!(
+        "Effect.Debuff.Stun 索引: {}",
+        effect_debuff_stun.tag_bit_index
+    );
 }
