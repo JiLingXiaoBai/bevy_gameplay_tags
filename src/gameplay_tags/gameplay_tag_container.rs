@@ -74,6 +74,10 @@ impl GameplayTagContainer {
             .get(&tag.tag_bit_index)
             .map_or(false, |&c| c > 0)
         {
+            if manager.check_has_active_descendants(tag.tag_bit_index, &self.ref_counts) {
+                return;
+            }
+
             if let Some(inherited_bits) = manager.get_inherited_bits(tag) {
                 // 1. Update Reference Counts and track which bits need to be cleared
                 let mut bits_to_clear = [0u64; MAX_TAG_BLOCKS];

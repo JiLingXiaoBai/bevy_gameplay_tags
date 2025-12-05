@@ -1,5 +1,5 @@
 use super::gameplay_tag::GameplayTag;
-use super::gameplay_tag_container::{add_bit_with_tag, GameplayTagBits};
+use super::gameplay_tag_container::{GameplayTagBits, add_bit_with_tag};
 use crate::unique_name::UniqueName;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
@@ -8,6 +8,7 @@ pub const MAX_TAG_COUNTS: usize = 512;
 pub struct GameplayTagManager {
     pub tag_name_to_index: HashMap<UniqueName, u16>,
     pub tag_parent_index: Vec<Option<u16>>,
+    pub tag_children: Vec<Vec<u16>>,
     pub tag_inherited_bits: Vec<GameplayTagBits>,
     next_tag_index: u16,
 }
@@ -17,6 +18,7 @@ impl Default for GameplayTagManager {
         Self {
             tag_name_to_index: HashMap::new(),
             tag_parent_index: Vec::new(),
+            tag_children: Vec::new(),
             tag_inherited_bits: Vec::new(),
             next_tag_index: 0,
         }
@@ -54,13 +56,22 @@ impl GameplayTagManager {
             .unwrap_or_else(GameplayTagBits::default);
 
         // Set the current tag's own bit in the inherited bits
-        let self_tag = GameplayTag { tag_bit_index: new_index };
+        let self_tag = GameplayTag {
+            tag_bit_index: new_index,
+        };
         add_bit_with_tag(&mut inherited_bits, &self_tag);
 
         // Update the Manager data structures
-        self.tag_name_to_index.insert(unique_name, new_index);
-        self.tag_parent_index.push(parent_tag_index);
-        self.tag_inherited_bits.push(inherited_bits);
+        if new_index as usize == self.tag_parent_index.len() {
+            self.tag_parent_index.push(parent_tag_index);
+            self.tag_inherited_bits.push(inherited_bits);
+            self.tag_children.push(Vec::new());
+        }
+        if let Some(p_index) = parent_tag_index {
+            if (p_index as usize) < self.tag_children.len() {
+                self.tag_children[p_index as usize].push(new_index);
+            }
+        }
         self.next_tag_index += 1;
 
         self_tag
@@ -68,5 +79,30 @@ impl GameplayTagManager {
 
     pub fn get_inherited_bits(&self, tag: &GameplayTag) -> Option<&GameplayTagBits> {
         self.tag_inherited_bits.get(tag.tag_bit_index as usize)
+    }
+    pub fn check_has_active_descendants(
+        &self,
+        tag_index: u16,
+        ref_counts: &HashMap<u16, u16>,
+    ) -> bool {
+        let mut stack: Vec<u16> = Vec::new();
+        if (tag_index as usize) < self.tag_children.len() {
+            stack.extend(self.tag_children[tag_index as usize].iter().copied());
+        } else {
+            return false;
+        }
+
+        while let Some(current_index) = stack.pop() {
+            if ref_counts.get(&current_index).map_or(false, |&c| c > 0) {
+                return true;
+            }
+
+            if (current_index as usize) < self.tag_children.len() {
+                if let Some(children) = self.tag_children.get(current_index as usize) {
+                    stack.extend(children.iter().copied());
+                }
+            }
+        }
+        false
     }
 }
